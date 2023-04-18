@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.transaction.interceptor.DefaultTransactionAttribute;
@@ -172,5 +173,31 @@ public class BasicTxTest {
         //것이다.
         //스프링은 이 경우 UnexpectedRollbackException 런타임 예외를 던진다. 그래서 커밋을
         //시도했지만, 기대하지 않은 롤백이 발생했다는 것을 명확하게 알려준다.
+    }
+
+    @Test
+    void inner_rollback_requires_new() {
+        log.info("외부 트랜잭션 시작");
+        TransactionStatus outer = txManager.getTransaction(new DefaultTransactionAttribute());
+        log.info("outer.isNewTransaction() = {}",outer.isNewTransaction());  //true
+
+        log.info("내부 트랜잭션 시작");
+        DefaultTransactionAttribute definition = new DefaultTransactionAttribute();
+
+        //default는 PROPAGATION_REQUIRED (기존 트랜잭션이 있으면 참여하는 옵션)
+        //PROPAGATION_REQUIRES_NEW는 물리적 새 트랜잭션 생성
+        definition.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        TransactionStatus inner = txManager.getTransaction(definition);  //결국 새 커넥션을 얻어서 새 트랜잭션을 생성하는것.
+        log.info("outer.isNewTransaction() = {}",inner.isNewTransaction());  //true
+
+        log.info("내부 트랜잭션 롤백");
+        txManager.rollback(inner);
+
+        log.info("외부 트랜잭션 커밋");
+        txManager.commit(outer);
+
+        //정리
+        //REQUIRES_NEW 옵션을 사용하면 물리 트랜잭션이 명확하게 분리된다.
+        //REQUIRES_NEW 를 사용하면 데이터베이스 커넥션이 동시에 2개 사용된다는 점을 주의해야 한다.
     }
 }
