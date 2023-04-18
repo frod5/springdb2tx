@@ -102,4 +102,24 @@ public class BasicTxTest {
         //트랜잭션이 내부에서 추가로 사용되면, 트랜잭션 매니저를 통해 논리 트랜잭션을 관리하고, 모든 논리
         //트랜잭션이 커밋되면 물리 트랜잭션이 커밋된다고 이해하면 된다.
     }
+
+    @Test
+    void outer_rollback() {
+        log.info("외부 트랜잭션 시작");
+        TransactionStatus outer = txManager.getTransaction(new DefaultTransactionAttribute());
+
+        log.info("내부 트랜잭션 시작");
+        TransactionStatus inner = txManager.getTransaction(new DefaultTransactionAttribute());
+
+        log.info("내부 트랜잭션 커밋");
+        txManager.commit(inner);
+
+        log.info("외부 트랜잭션 롤백");
+        txManager.rollback(outer);
+
+        //외부 트랜잭션이 물리 트랜잭션을 시작하고 롤백하는 것을 확인할 수 있다.
+        //내부 트랜잭션은 앞서 배운대로 직접 물리 트랜잭션에 관여하지 않는다.
+        //결과적으로 외부 트랜잭션에서 시작한 물리 트랜잭션의 범위가 내부 트랜잭션까지 사용된다. 이후 외부
+        //트랜잭션이 롤백되면서 전체 내용은 모두 롤백된다.
+    }
 }
