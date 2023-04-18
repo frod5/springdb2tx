@@ -199,5 +199,9 @@ public class BasicTxTest {
         //정리
         //REQUIRES_NEW 옵션을 사용하면 물리 트랜잭션이 명확하게 분리된다.
         //REQUIRES_NEW 를 사용하면 데이터베이스 커넥션이 동시에 2개 사용된다는 점을 주의해야 한다.
+
+        //트랜잭션 전파와 옵션
+        //isolation , timeout , readOnly 는 트랜잭션이 처음 시작될 때만 적용된다. 트랜잭션에 참여하는 경우에는 적용되지 않는다.
+        //예를 들어서 REQUIRED 를 통한 트랜잭션 시작, REQUIRES_NEW 를 통한 트랜잭션 시작 시점에만 적용된다.
     }
 }
