@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.UnexpectedRollbackException;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -133,5 +134,42 @@ class MemberServiceTest {
         //참고로 이 경우 어차피 롤백이 되었기 때문에, rollbackOnly 설정은 참고하지 않는다.
         //MemberService 가 예외를 던졌기 때문에 트랜잭션 AOP도 해당 예외를 그대로 밖으로 던진다.
         //클라이언트A는 LogRepository 부터 넘어온 런타임 예외를 받게 된다.
+    }
+
+    /**
+     * memberService    @Transactional : on
+     * memberRepository @Transactional : on
+     * logRepository    @Transactional : on exception
+     * 실무에서 가장 실수하기 좋은 케이스
+     */
+    @Test
+    void recoverException_fail() {
+        //given
+        String username = "로그예외_recoverException_fail";
+
+        //when
+        ;
+        assertThatThrownBy(() -> memberService.joinV2(username))
+                .isInstanceOf(UnexpectedRollbackException.class);
+
+        //then
+        assertTrue(memberRepository.find(username).isEmpty());
+        assertTrue(logRepository.find(username).isEmpty());
+
+        //flow
+        //LogRepository 에서 예외가 발생한다. 예외를 던지면 LogRepository 의 트랜잭션 AOP가 해당 예외를 받는다.
+        //신규 트랜잭션이 아니므로 물리 트랜잭션을 롤백하지는 않고, 트랜잭션 동기화 매니저에 rollbackOnly 를 표시한다.
+        //이후 트랜잭션 AOP는 전달 받은 예외를 밖으로 던진다.
+        //예외가 MemberService 에 던져지고, MemberService 는 해당 예외를 복구한다. 그리고 정상적으로 리턴한다.
+        //정상 흐름이 되었으므로 MemberService 의 트랜잭션 AOP는 커밋을 호출한다.
+        //커밋을 호출할 때 신규 트랜잭션이므로 실제 물리 트랜잭션을 커밋해야 한다. 이때 rollbackOnly 를 체크한다.
+        //rollbackOnly 가 체크 되어 있으므로 물리 트랜잭션을 롤백한다.
+        //트랜잭션 매니저는 UnexpectedRollbackException 예외를 던진다.
+        //트랜잭션 AOP도 전달받은 UnexpectedRollbackException 을 클라이언트에 던진다.
+
+        //정리
+        //논리 트랜잭션 중 하나라도 롤백되면 전체 트랜잭션은 롤백된다.
+        //내부 트랜잭션이 롤백 되었는데, 외부 트랜잭션이 커밋되면 UnexpectedRollbackException 예외가 발생한다.
+        //rollbackOnly 상황에서 커밋이 발생하면 UnexpectedRollbackException 예외가 발생한다.
     }
 }
